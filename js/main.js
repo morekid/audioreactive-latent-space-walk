@@ -89,6 +89,7 @@ class ImageGenerator {
 }
 
 class UI {
+    isClicking = false;
     canvas;
     ctx;
     vector = StartVectors.zero; // copies initial vector
@@ -98,6 +99,8 @@ class UI {
     fpsDisplay = document.querySelector("#fps-display")
     FFTStateDisplay = document.querySelector("#fft-state-display")
     FFTJobDisplay = document.querySelector("#fft-job-display")
+    songTimingDisplay = document.querySelector("#song-timing-display")
+    songDurationDisplay = document.querySelector("#song-duration-display")
 
     constructor() {
         this.initVectorDrawingCanvas();
@@ -106,6 +109,13 @@ class UI {
 
     update() {
         this.fpsDisplay.textContent = frameRate();
+        this.drawSongWaveform();
+        this.drawSongAmplitude();
+        this.drawSongAmplitudeCircle();
+        this.drawFFT();
+
+        this.songTimingDisplay.textContent = Utils.formatMMSS(sm.song.currentTime());
+        this.songDurationDisplay.textContent = Utils.formatMMSS(sm.song.duration());
     }
 
     updateAnalysisDisplay() {
@@ -138,8 +148,14 @@ class UI {
     }
 
     trackInputs() {
+        this.canvas.addEventListener('mousedown', e => {
+            this.isClicking = true
+        });
+        this.canvas.addEventListener('mouseup', e => {
+            this.isClicking = false
+        });
         this.canvas.addEventListener('mousemove', e => {
-            if (e.offsetX >= 0 && e.offsetX < 512 && e.offsetY >= 0 && e.offsetY < 512) {
+            if (this.isClicking && e.offsetX >= 0 && e.offsetX < 512 && e.offsetY >= 0 && e.offsetY < 512) {
                 this.lastMousePos.x = e.offsetX;
                 this.lastMousePos.y = e.offsetY;
                 this.applyXY(this.lastMousePos.x, this.lastMousePos.y);
@@ -147,7 +163,7 @@ class UI {
         });
         
         document.addEventListener('keypress', e => {
-            if (e.key == "l") this.makeLine();
+            if (e.key == "l") this.makeLineVector();
             if (e.key == "1") this.actions.downloadVector();
             if (e.key == "2") this.actions.downloadImage();
             if (e.key == "3") this.actions.downloadBoth();
@@ -155,23 +171,24 @@ class UI {
         });
     }
 
-    makeLine() {
-        let x = this.lastMousePos.x
-        let y = 0;
-        while (y < 512) {
+    makeLineVector() {
+        let y = this.lastMousePos.y
+        let x = 0;
+        while (x < 512) {
             this.applyXY(x, y);
-            y++;
+            x++;
         }
     }
 
     applyXY(x, y) {
-        let scaledX = (x / this.vectorSize.x * 2) - 1;
+        let invertedY = this.vectorSize.y - y;
+        let scaledInvertedY = map(invertedY, 0, this.vectorSize.y, -1, 1);
 
         // modify latent space vector
-        this.vector[y] = scaledX;
+        this.vector[x] = scaledInvertedY;
         this.vectorChanged = true;
 
-        this.drawVectorPoint(x, y);
+        this.drawVectorPoint(x, invertedY);
 
         globalAttemptGeneratingImage();
     }
@@ -181,22 +198,98 @@ class UI {
         this.vectorChanged = true;
 
         for (let i = 0; i < vector.length; i++) {
-            let y = i;
-            let x = vector[i];
-            x = map(x, -1, 1, 0, this.vectorSize.x);
+            let x = i;
+            let y = vector[i];
+            y = map(y, -1, 1, 0, this.vectorSize.y);
             this.drawVectorPoint(x, y);
         }
     }
 
     drawVectorPoint(x, y) {
         // draw matrix
-        for (let i = 0; i < this.vectorSize.x; i++) { // reset line color
+        for (let i = 0; i < this.vectorSize.y; i++) { // reset line color
             this.ctx.fillStyle = '#fafafa';
-            // if (i < x) this.ctx.fillStyle = '#f0f0f0';
-            this.ctx.fillRect(i, y, 1, 1);
+            this.ctx.fillRect(x, i, 1, 1);
         }
         this.ctx.fillStyle = '#222222';
-        this.ctx.fillRect(x, y, 1, 1);
+        this.ctx.fillRect(x, this.vectorSize.y-y, 1, 1);
+    }
+
+    drawSongWaveform() {
+        let waveHeight = 100;
+
+        stroke("#222222");
+        noFill();
+        push();
+        beginShape();
+        for (let i = 0; i < sm.wave.length; i++){
+            let x = map(i, 0, sm.wave.length, 0, width);
+            var h = map(sm.wave[i], -1, 1, -waveHeight/2, waveHeight/2);
+            vertex(x, waveHeight/2-h);
+        }
+        endShape();
+        pop();
+
+        noStroke();
+        fill(250, 100, 250);
+        rect(map(sm.song.currentTime(), 0, sm.song.duration(), 0, width), 0, 2, waveHeight);
+
+    }
+
+    drawSongAmplitude() {
+        let values;
+        let w = width - 100;
+        if (sm.ampValues.length > w) values = sm.ampValues.slice(-w)
+        else values = sm.ampValues.slice();
+            
+        stroke("#222222");
+        noFill();
+        push();
+        beginShape();
+        for (var i = 0; i < values.length; i++) {
+            var y = map(values[i], 0, 1, 200, 100);
+            vertex(i, y);
+        }
+        endShape();
+        pop();
+    }
+
+    drawFFT() {
+        stroke("#222222");
+        noFill();
+        let lastSpectrum = sm.spectrums[sm.spectrums.length - 1];
+        if (lastSpectrum) {
+            push();
+            beginShape();
+            for (let i = 0; i < lastSpectrum.length; i++){
+                let x = map(i, 0, lastSpectrum.length, 0, width);
+                var h = map(lastSpectrum[i], 0, 255, 0, 100);
+                vertex(x, 350-h);
+            }
+            endShape();
+            pop();
+        }
+    }
+
+    drawSongAmplitudeCircle() {
+        let values;
+        if (sm.ampValues.length > 360) values = sm.ampValues.slice(-360)
+        else values = sm.ampValues.slice();
+
+        stroke("#222222");
+        noFill();
+        push();
+        translate(width -50, 150);
+        beginShape();
+        for (var i = 0; i < values.length; i++) {
+            let r = 100;
+            let scaledR = 10 + r * values[i];
+            let x = scaledR * cos(i);
+            let y = scaledR * sin(i);
+            vertex(x, y);
+        }
+        endShape();
+        pop();
     }
 
     actions = {
@@ -274,13 +367,10 @@ class SoundManager {
 
     update() {
         this.ampValues.push(this.amp.getLevel())
-        // this.drawSoundLine();
-        // this.drawSoundCircle();
+
         if (this.song.isPlaying() && this.shouldAnalyse) {
             this.getFFT();
         }
-        // this.drawFFT();
-        // this.drawWave();
     }
 
     toggleAudio() {
@@ -295,20 +385,6 @@ class SoundManager {
     getWave() {
         let frames = fps * this.song.duration()
         this.wave = this.song.getPeaks(frames);
-    }
-
-    drawWave() {
-        stroke(250);
-        noFill();
-        for (let i = 0; i < this.wave.length; i++){
-            let x = map(i, 0, this.wave.length, 0, width);
-            var h = map(this.wave[i], -1, 1, -100, 100);
-            line(x, height/2, x, height/2-h);
-        }
-
-        noStroke();
-        fill(0,255,0);
-        rect(map(this.song.currentTime(), 0, this.song.duration(), 0, width), 0, 5, height);
     }
 
     startFFTAnalysis() {
@@ -335,56 +411,6 @@ class SoundManager {
         let spectrum = this.fft.analyze();
         this.spectrums.push(spectrum);
     }
-
-    drawFFT() {
-        let lastSpectrum = this.spectrums[this.spectrums.length - 1];
-        if (lastSpectrum) {
-            for (let i = 0; i < lastSpectrum.length; i++){
-                let x = map(i, 0, lastSpectrum.length, 0, width);
-                var h = map(lastSpectrum[i], 0, 255, 0, 100);
-                line(x, height/2, x, height/2-h);
-            
-            }
-        }
-    }
-
-    drawSoundCircle() {
-        let values;
-        if (this.ampValues.length > 360) values = this.ampValues.slice(-360)
-        else values = this.ampValues.slice();
-
-        stroke(250);
-        noFill();
-        push();
-        translate(width / 2, height / 2);
-        beginShape();
-        for (var i = 0; i < values.length; i++) {
-            let r = 3000;
-            let scaledR = 100 + r * values[i];
-            let x = scaledR * cos(i);
-            let y = scaledR * sin(i);
-            vertex(x, y);
-        }
-        endShape();
-        pop();
-    }
-
-    drawSoundLine() {
-        let values;
-        if (this.ampValues.length > width) values = this.ampValues.slice(-width)
-        else values = this.ampValues.slice();
-            
-        stroke(250);
-        noFill();
-        push();
-        beginShape();
-        for (var i = 0; i < values.length; i++) {
-            var y = map(values[i], 0, 1, height, 0);
-            vertex(i, y);
-        }
-        endShape();
-        pop();
-    }
 }
 
 class Utils {
@@ -404,6 +430,13 @@ class Utils {
             vectors.push(vector);
         }
         return vectors;
+    }
+    static formatMMSS(time) {
+        var minutes = Math.floor(time / 60);
+        var seconds = (time - minutes * 60).toFixed(2);
+        if (minutes.toString().length < 2) minutes = "0" + minutes;
+        if (seconds.toString().length < 5) seconds = "0" + seconds;
+        return minutes + ":" + seconds;
     }
 }
 
@@ -432,13 +465,6 @@ function draw() {
     clear();
     sm.update();
     ui.update();
-
-    // setInterval(function () {
-    //     if(ui.vectorChanged && !ig.isGenerating) {
-    //         ig.generateImage();
-    //         ui.vectorChanged = false;
-    //     }
-    // }, 40);
 }
 
 function globalAttemptGeneratingImage() {
