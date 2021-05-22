@@ -2,6 +2,7 @@ class ImageGenerator {
     outputImage;
     isGenerating = false;
     count = 0;
+    image = document.querySelector("#generated-image");
     job = {
         running: false,
         current: 0,
@@ -11,32 +12,32 @@ class ImageGenerator {
 
     generateImage(job) {
         this.isGenerating = true;
-        const path = "http://localhost:8002/query"; //the default path used by Runway / StyleGAN for receiving post requests
+        const path = "http://localhost:8000/query"; //the default path used by Runway / StyleGAN for receiving post requests
         const data = {
             z: ui.vector, 
             truncation: 1
         };
         if (job) {
             httpPost(path, 'json', data, this.stepDone.bind(this), this.stepError.bind(this));
+            // this.stepDone({ image: "" }) // comment previous and uncomment this for testing
         } else {
             httpPost(path, 'json', data, this.success.bind(this), this.error.bind(this));
         }
     }
 
-    error(error) { //if the generate image post request fails
+    createImage(result) {
+        this.image.src = result.image;
+        this.count++;
+        this.isGenerating = false;
+    }
+
+    error(error) {
         console.error(error);
         globalAttemptGeneratingImage();
     }
 
     success(result) {
-        let image = document.querySelector("#generated-image");
-        image.src = result.image;
-        this.imageCreated();
-    }
-
-    imageCreated() {
-        this.count++;
-        this.isGenerating = false;
+        this.createImage(result);
         globalAttemptGeneratingImage();
     }
 
@@ -55,12 +56,16 @@ class ImageGenerator {
     }
 
     stepDone(result) {
-        let image = document.querySelector("#generated-image");
-        image.src = result.image;
+        this.createImage(result);
         ui.actions.downloadBoth();
 
         this.job.current += 1;
-        if (this.job.current <= this.job.vectors.length) this.stepJob();
+        if (this.job.current < this.job.vectors.length) {
+            let _this = this;
+            setTimeout( function () {
+                _this.stepJob();
+            }, 100);
+        }
         else this.jobDone();
     }
 
@@ -72,7 +77,7 @@ class ImageGenerator {
     jobDone(error) {
         let last = "Generated ";
         if (error) last = "Interrupted at ";
-        last += (this.job.current + 1) + " images";
+        last += this.job.current + " images";
         this.job = {
             running: false,
             current: 0,
@@ -81,7 +86,6 @@ class ImageGenerator {
         }
         ui.updateJobDisplay();
     }
-
 }
 
 class UI {
@@ -198,52 +202,42 @@ class UI {
     actions = {
         parent: this,
         generatedImage: document.querySelector("#generated-image"),
+        nameMeta() {
+            return nf(ig.count, 4) + "--" + Utils.getFormattedTime();
+        },
         downloadBoth() {
             this.downloadImage();
             this.downloadVector();
         },
-        downloadImage: function () {
-            // save(`img_${nf(ig.count, 4)}--${Utils.getFormattedTime()}`);
-            // let saveImgFeedback = document.querySelector("#save-image");
-            // saveImgFeedback.classList.add("is-showing");
-            // setTimeout(function () {
-            //     saveImgFeedback.classList.remove("is-showing")
-            // }, 200);
-            
+        downloadImage() {
             let dataStr = this.generatedImage.src;
             let downloadAnchorNode = document.createElement('a');
             downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", `img_${nf(ig.count, 4)}--${Utils.getFormattedTime()}.png`);
+            downloadAnchorNode.setAttribute("download", "img-" + this.nameMeta() + ".png");
             document.body.appendChild(downloadAnchorNode); // required for firefox
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
+
+            let getImgFeedback = document.querySelector("#get-image");
+            getImgFeedback.classList.add("is-showing");
+            setTimeout(function () {
+                getImgFeedback.classList.remove("is-showing")
+            }, 200);
         },
         downloadVector() {
             let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.parent.vector));
             let downloadAnchorNode = document.createElement('a');
             downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "vectors-" + Utils.getFormattedTime() + ".json");
+            downloadAnchorNode.setAttribute("download",  "vec-" + this.nameMeta() + ".json");
             document.body.appendChild(downloadAnchorNode); // required for firefox
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
-        },
-        saveVector: function () {
-            let d = new Date();
-            localStorage.setItem("img_" + nf(ig.count, 4) + "--" + Utils.getFormattedTime(), this.parent.vector);
-            let saveVectorFeedback = document.querySelector("#save-vector");
-            saveVectorFeedback.classList.add("is-showing");
+
+            let getVectorFeedback = document.querySelector("#get-vector");
+            getVectorFeedback.classList.add("is-showing");
             setTimeout(function () {
-                saveVectorFeedback.classList.remove("is-showing")
+                getVectorFeedback.classList.remove("is-showing")
             }, 200);
-        },
-        downloadVectors() {
-            let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(localStorage, null, 2));
-            let downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "vectors-" + Utils.getFormattedTime() + ".json");
-            document.body.appendChild(downloadAnchorNode); // required for firefox
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
         },
         resetFFTAnalysis() {
             sm.resetFFTAnalysis();
@@ -253,7 +247,7 @@ class UI {
         },
         generateFFTWalk() {
             let vectors = Utils.mapFFTToLatentSpaceRange(sm.spectrums);
-            ui.startJob(vectors);
+            ig.startJob(vectors);
         }
     }
 }

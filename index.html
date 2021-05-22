@@ -65,8 +65,8 @@
         color: #555555;
       }
 
-      .save-vector,
-      .save-image {
+      .get-vector,
+      .get-image {
         position: absolute;
         top: 0;
         left: 0;
@@ -77,8 +77,8 @@
         transition: all 1.2s;
       }
 
-      .save-vector.is-showing,
-      .save-image.is-showing {
+      .get-vector.is-showing,
+      .get-image.is-showing {
         opacity: 1;
         transition: all 0.2s;
       }
@@ -87,12 +87,12 @@
   <body>
     <div class="top">
       <div class="left">
-        <div id="save-image" class="save-image">saving image...</div>
+        <div id="get-image" class="get-image">saving image...</div>
         <div class="generated-image-wrapper"><img id="generated-image" class="generated-image" src=""></div>
         <div id="p5js" class="p5js"></div>
       </div>
       <div class="right">
-        <div id="save-vector" class="save-vector">saving vector...</div>
+        <div id="get-vector" class="get-vector">saving vector...</div>
         <canvas id="matrix" class="matrix" width="512" height="512"></canvas>
       </div>
     </div>
