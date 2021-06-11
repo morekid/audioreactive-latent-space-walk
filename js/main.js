@@ -107,6 +107,13 @@ class UI {
         this.trackInputs();
     }
 
+    initVectorDrawingCanvas() {
+        this.canvas = document.querySelector('#matrix');
+        this.ctx = this.canvas.getContext('2d');
+        this.ctx.fillStyle = '#fafafa';
+        this.ctx.fillRect(0, 0, this.vectorSize.x, this.vectorSize.y);
+    }
+
     update() {
         this.fpsDisplay.textContent = frameRate();
         this.drawSongWaveform();
@@ -116,35 +123,6 @@ class UI {
 
         this.songTimingDisplay.textContent = Utils.formatMMSS(sm.song.currentTime());
         this.songDurationDisplay.textContent = Utils.formatMMSS(sm.song.duration());
-    }
-
-    updateAnalysisDisplay() {
-        if (sm.song.isPlaying() && sm.shouldAnalyse) {
-            this.FFTStateDisplay.textContent = "Analysing...";
-        } else if (!sm.song.isPlaying() && sm.shouldAnalyse) {
-            this.FFTStateDisplay.textContent = "-";
-        } else if (!sm.song.isPlaying() && !sm.shouldAnalyse) {
-            this.FFTStateDisplay.textContent = "Done";
-        }
-    }
-
-    updateJobDisplay() {
-        if (ig.job.running) {
-            this.FFTJobDisplay.textContent = "Generating " + (ig.job.current + 1) + " of " + (ig.job.vectors.length) + " images";
-        } else {
-            if (ig.job.last) {
-                this.FFTJobDisplay.textContent = ig.job.last;
-            } else {
-                this.FFTJobDisplay.textContent = "-";
-            }
-        }
-    }
-
-    initVectorDrawingCanvas() {
-        this.canvas = document.querySelector('#matrix');
-        this.ctx = this.canvas.getContext('2d');
-        this.ctx.fillStyle = '#fafafa';
-        this.ctx.fillRect(0, 0, this.vectorSize.x, this.vectorSize.y);
     }
 
     trackInputs() {
@@ -169,6 +147,28 @@ class UI {
             if (e.key == "3") this.actions.downloadBoth();
             if (e.key == "0") this.actions.resetFFTAnalysis();
         });
+    }
+
+    updateAnalysisDisplay() {
+        if (sm.song.isPlaying() && sm.shouldAnalyse) {
+            this.FFTStateDisplay.textContent = "Analysing...";
+        } else if (!sm.song.isPlaying() && sm.shouldAnalyse) {
+            this.FFTStateDisplay.textContent = "-";
+        } else if (!sm.song.isPlaying() && !sm.shouldAnalyse) {
+            this.FFTStateDisplay.textContent = "Done";
+        }
+    }
+
+    updateJobDisplay() {
+        if (ig.job.running) {
+            this.FFTJobDisplay.textContent = "Generating " + (ig.job.current + 1) + " of " + (ig.job.vectors.length) + " images";
+        } else {
+            if (ig.job.last) {
+                this.FFTJobDisplay.textContent = ig.job.last;
+            } else {
+                this.FFTJobDisplay.textContent = "-";
+            }
+        }
     }
 
     makeLineVector() {
