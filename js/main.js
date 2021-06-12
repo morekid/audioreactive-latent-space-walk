@@ -1,4 +1,5 @@
 class ImageGenerator {
+    testRun = true; // set to true for testing without RunwayML
     outputImage;
     isGenerating = false;
     count = 0;
@@ -14,14 +15,15 @@ class ImageGenerator {
         this.isGenerating = true;
         const path = "http://localhost:8000/query"; //the default path used by Runway / StyleGAN for receiving post requests
         const data = {
-            z: ui.vector, 
+            z: w.ui.vector, 
             truncation: 1
         };
         if (job) {
-            httpPost(path, 'json', data, this.stepDone.bind(this), this.stepError.bind(this));
-            // this.stepDone({ image: "" }) // comment previous and uncomment this for testing
+            if (!this.testRun) httpPost(path, 'json', data, this.stepDone.bind(this), this.stepError.bind(this));
+            else this.stepDone();
         } else {
-            httpPost(path, 'json', data, this.success.bind(this), this.error.bind(this));
+            if (!this.testRun) httpPost(path, 'json', data, this.success.bind(this), this.error.bind(this));
+            else this.success();
         }
     }
 
@@ -37,7 +39,7 @@ class ImageGenerator {
     }
 
     success(result) {
-        this.createImage(result);
+        if (!this.testRun) this.createImage(result);
         globalAttemptGeneratingImage();
     }
 
@@ -46,25 +48,34 @@ class ImageGenerator {
         this.job.current = 0;
         this.job.vectors = vectors;
         this.stepJob();
-        ui.updateJobDisplay();
+        w.ui.updateJobDisplay();
     }
 
     stepJob() {
-        ui.updateVector(this.job.vectors[this.job.current])
+        w.ui.updateVector(this.job.vectors[this.job.current])
         this.generateImage(true);
-        ui.updateJobDisplay();
+        w.ui.updateJobDisplay();
     }
 
     stepDone(result) {
-        this.createImage(result);
-        ui.actions.downloadBoth();
+        if (!this.testRun) {
+            this.createImage(result);
+            w.ui.actions.downloadBoth();
+        }
 
         this.job.current += 1;
         if (this.job.current < this.job.vectors.length) {
             let _this = this;
-            setTimeout( function () {
-                _this.stepJob();
-            }, 100);
+            if (!this.testRun)  {
+                setTimeout( function () {
+                    _this.stepJob();
+                }, 100);
+            } else {
+                setTimeout( function () {
+                    _this.stepJob();
+                }, 33.3);
+                
+            }
         }
         else this.jobDone();
     }
@@ -84,62 +95,44 @@ class ImageGenerator {
             vectors: [],
             last: last
         }
-        ui.updateJobDisplay();
+        w.ui.updateJobDisplay();
     }
 }
 
 class UI {
-    isClicking = false;
-    canvas;
-    ctx;
     vector = StartVectors.zero; // copies initial vector
     vectorSize = { x: 512, y: 512 }
     vectorChanged = true;
-    lastMousePos = { x: 0, y: 0 }
     fpsDisplay = document.querySelector("#fps-display")
     FFTStateDisplay = document.querySelector("#fft-state-display")
     FFTJobDisplay = document.querySelector("#fft-job-display")
-    songTimingDisplay = document.querySelector("#song-timing-display")
-    songDurationDisplay = document.querySelector("#song-duration-display")
+    FFTPlaybackDisplay = document.querySelector("#fft-playback-display")
+    vectorAreaOffset = this.vectorSize.y + 48;
 
     constructor() {
-        this.initVectorDrawingCanvas();
         this.trackInputs();
     }
 
-    initVectorDrawingCanvas() {
-        this.canvas = document.querySelector('#matrix');
-        this.ctx = this.canvas.getContext('2d');
-        this.ctx.fillStyle = '#fafafa';
-        this.ctx.fillRect(0, 0, this.vectorSize.x, this.vectorSize.y);
-    }
-
     update() {
-        this.fpsDisplay.textContent = frameRate();
-        this.drawSongWaveform();
+        this.fpsDisplay.textContent = frameRate().toFixed(2);
+        this.trackMouse();
+        this.drawVector();
+        this.drawWaveforms();
         this.drawSongAmplitude();
         this.drawSongAmplitudeCircle();
         this.drawFFT();
+        this.updatePlaybackDisplay()
+    }
 
-        this.songTimingDisplay.textContent = Utils.formatMMSS(sm.song.currentTime());
-        this.songDurationDisplay.textContent = Utils.formatMMSS(sm.song.duration());
+    trackMouse() {
+        if (mouseIsPressed) {
+            if (mouseX >= 0 && mouseX < this.vectorSize.x && mouseY >= 0 && mouseY < this.vectorSize.y) {
+                this.applyXY(mouseX, mouseY);
+            }
+        }
     }
 
     trackInputs() {
-        this.canvas.addEventListener('mousedown', e => {
-            this.isClicking = true
-        });
-        this.canvas.addEventListener('mouseup', e => {
-            this.isClicking = false
-        });
-        this.canvas.addEventListener('mousemove', e => {
-            if (this.isClicking && e.offsetX >= 0 && e.offsetX < 512 && e.offsetY >= 0 && e.offsetY < 512) {
-                this.lastMousePos.x = e.offsetX;
-                this.lastMousePos.y = e.offsetY;
-                this.applyXY(this.lastMousePos.x, this.lastMousePos.y);
-            }
-        });
-        
         document.addEventListener('keypress', e => {
             if (e.key == "l") this.makeLineVector();
             if (e.key == "1") this.actions.downloadVector();
@@ -149,46 +142,20 @@ class UI {
         });
     }
 
-    updateAnalysisDisplay() {
-        if (sm.song.isPlaying() && sm.shouldAnalyse) {
-            this.FFTStateDisplay.textContent = "Analysing...";
-        } else if (!sm.song.isPlaying() && sm.shouldAnalyse) {
-            this.FFTStateDisplay.textContent = "-";
-        } else if (!sm.song.isPlaying() && !sm.shouldAnalyse) {
-            this.FFTStateDisplay.textContent = "Done";
-        }
-    }
-
-    updateJobDisplay() {
-        if (ig.job.running) {
-            this.FFTJobDisplay.textContent = "Generating " + (ig.job.current + 1) + " of " + (ig.job.vectors.length) + " images";
-        } else {
-            if (ig.job.last) {
-                this.FFTJobDisplay.textContent = ig.job.last;
-            } else {
-                this.FFTJobDisplay.textContent = "-";
-            }
-        }
-    }
-
     makeLineVector() {
-        let y = this.lastMousePos.y
         let x = 0;
-        while (x < 512) {
-            this.applyXY(x, y);
+        while (x < this.vectorSize.y) {
+            this.applyXY(x, mouseY);
             x++;
         }
     }
 
     applyXY(x, y) {
-        let invertedY = this.vectorSize.y - y;
-        let scaledInvertedY = map(invertedY, 0, this.vectorSize.y, -1, 1);
+        let scaledInvertedY = map(y, 0, this.vectorSize.y, 1, -1);
 
         // modify latent space vector
         this.vector[x] = scaledInvertedY;
         this.vectorChanged = true;
-
-        this.drawVectorPoint(x, invertedY);
 
         globalAttemptGeneratingImage();
     }
@@ -196,75 +163,68 @@ class UI {
     updateVector(vector) {
         this.vector = vector;
         this.vectorChanged = true;
+    }
 
-        for (let i = 0; i < vector.length; i++) {
+    drawVector() {
+        fill("#fafafa");
+        noStroke();
+        rect(0, 0, this.vectorSize.x, this.vectorSize.y);
+        for (let i = 0; i < this.vector.length; i++) {
             let x = i;
-            let y = vector[i];
-            y = map(y, -1, 1, 0, this.vectorSize.y);
-            this.drawVectorPoint(x, y);
+            let scaledInvertedY = this.vector[i];
+            let y = map(scaledInvertedY, 1, -1, 0, this.vectorSize.y);
+            stroke("#222222");
+            noFill();
+            strokeWeight(1);
+            push();
+            translate(0, 0);
+            point(x, y);
+            pop();
         }
     }
 
-    drawVectorPoint(x, y) {
-        // draw matrix
-        for (let i = 0; i < this.vectorSize.y; i++) { // reset line color
-            this.ctx.fillStyle = '#fafafa';
-            this.ctx.fillRect(x, i, 1, 1);
-        }
-        this.ctx.fillStyle = '#222222';
-        this.ctx.fillRect(x, this.vectorSize.y-y, 1, 1);
-    }
-
-    drawSongWaveform() {
-        let waveHeight = 100;
-
+    drawWaveforms() {
+        let waveHeight = 50;
         stroke("#222222");
         noFill();
-        push();
-        beginShape();
-        for (let i = 0; i < sm.wave.length; i++){
-            let x = map(i, 0, sm.wave.length, 0, width);
-            var h = map(sm.wave[i], -1, 1, -waveHeight/2, waveHeight/2);
-            vertex(x, waveHeight/2-h);
+        for (let [i, wave] of w.sm.waves.entries()) {
+            push();
+            translate(0, this.vectorAreaOffset + waveHeight * i * 4);
+            beginShape();
+            for (let j = 0; j < wave.length; j++){
+                let x = map(j, 0, wave.length, 0, width);
+                var h = map(wave[j], -1, 1, -waveHeight/2, waveHeight/2);
+                vertex(x, waveHeight/2-h);
+            }
+            endShape();
+            pop();
         }
-        endShape();
-        pop();
-
         noStroke();
         fill(250, 100, 250);
-        rect(map(sm.song.currentTime(), 0, sm.song.duration(), 0, width), 0, 2, waveHeight);
-
+        for (let [i, track] of w.sm.tracks.entries()) {
+            push();
+            translate(0, this.vectorAreaOffset + (waveHeight * i * 4));
+            rect(map(track.currentTime(), 0, track.duration(), 0, width), 0, 2, waveHeight);
+            pop();
+        }
     }
 
     drawSongAmplitude() {
-        let values;
-        let w = width - 100;
-        if (sm.ampValues.length > w) values = sm.ampValues.slice(-w)
-        else values = sm.ampValues.slice();
-            
+        let waveHeight = 50;
+        let wdth = width - 100;
         stroke("#222222");
         noFill();
-        push();
-        beginShape();
-        for (var i = 0; i < values.length; i++) {
-            var y = map(values[i], 0, 1, 200, 100);
-            vertex(i, y);
-        }
-        endShape();
-        pop();
-    }
-
-    drawFFT() {
-        stroke("#222222");
-        noFill();
-        let lastSpectrum = sm.spectrums[sm.spectrums.length - 1];
-        if (lastSpectrum) {
+        for (let [i, amplitude] of w.sm.amplitudes.entries()) {
+            let values;
+            if (amplitude.length > wdth) values = amplitude.slice(-wdth)
+            else values = amplitude.slice();
+                
             push();
+            translate(0, this.vectorAreaOffset + waveHeight + (waveHeight * i * 4));
             beginShape();
-            for (let i = 0; i < lastSpectrum.length; i++){
-                let x = map(i, 0, lastSpectrum.length, 0, width);
-                var h = map(lastSpectrum[i], 0, 255, 0, 100);
-                vertex(x, 350-h);
+            for (var j = 0; j < values.length; j++) {
+                var y = map(values[j], 0, 1, waveHeight, 0);
+                vertex(j, y);
             }
             endShape();
             pop();
@@ -272,31 +232,107 @@ class UI {
     }
 
     drawSongAmplitudeCircle() {
-        let values;
-        if (sm.ampValues.length > 360) values = sm.ampValues.slice(-360)
-        else values = sm.ampValues.slice();
-
+        let waveHeight = 50;
         stroke("#222222");
         noFill();
-        push();
-        translate(width -50, 150);
-        beginShape();
-        for (var i = 0; i < values.length; i++) {
-            let r = 100;
-            let scaledR = 10 + r * values[i];
-            let x = scaledR * cos(i);
-            let y = scaledR * sin(i);
-            vertex(x, y);
+        for (let [i, amplitude] of w.sm.amplitudes.entries()) {
+            let values;
+            if (amplitude.length > 360) values = amplitude.slice(-360)
+            else values = amplitude.slice();
+    
+            push();
+            translate(width - 50, this.vectorAreaOffset + (waveHeight * 1.5) + (waveHeight * i * 4));
+            beginShape();
+            for (var j = 0; j < values.length; j++) {
+                let r = 50;
+                let scaledR = 10 + r * values[j];
+                let x = scaledR * cos(j);
+                let y = scaledR * sin(j);
+                vertex(x, y);
+            }
+            endShape();
+            pop();
         }
-        endShape();
-        pop();
+    }
+
+    drawFFT() {
+        let waveHeight = 50;
+        stroke("#222222");
+        noFill();
+        for (let [i, spectrums] of w.sm.analysis.entries()) {
+            let lastSpectrum = spectrums[spectrums.length - 1];
+            if (lastSpectrum) {
+                push();
+                translate(0, this.vectorAreaOffset + (waveHeight * 2) + (waveHeight * i * 4));
+                beginShape();
+                for (let j = 0; j < lastSpectrum.length; j++){
+                    let x = map(j, 0, lastSpectrum.length, 0, width);
+                    var h = map(lastSpectrum[j], 0, 255, 0, waveHeight);
+                    vertex(x, waveHeight-h);
+                }
+                endShape();
+                pop();
+            }
+        }
+    }
+
+    updateAnalysisDisplay() {
+        let text = "";
+        let tracksAmt = 0;
+        if (w.sm.shouldAnalyse) {
+            text += "Analysing "
+            for (let track of w.sm.tracks) {
+                if (track.isPlaying()) tracksAmt++;
+            }
+            text += tracksAmt + " of " + w.sm.tracks.length + " tracks"
+        } else {
+            let analysed = 0;
+            for (let spectrums of w.sm.analysis) {
+                if (spectrums.length > 0) {
+                    analysed++;
+                }
+            }
+            if (analysed) {
+                text += "Analysed " + analysed + " of " + w.sm.analysis.length + " tracks"
+            } else {
+                text += "-"
+            }
+        }
+        this.FFTStateDisplay.textContent = text;
+    }
+
+    updateJobDisplay() {
+        if (w.ig.job.running) {
+            this.FFTJobDisplay.textContent = "Generating " + (w.ig.job.current + 1) + " of " + (w.ig.job.vectors.length) + " images";
+        } else {
+            if (w.ig.job.last) {
+                this.FFTJobDisplay.textContent = w.ig.job.last;
+            } else {
+                this.FFTJobDisplay.textContent = "-";
+            }
+        }
+        if (w.ig.testRun) this.FFTJobDisplay.textContent = "(Test Run) " + this.FFTJobDisplay.textContent;
+    }
+
+    updatePlaybackDisplay() {
+        let text = "";
+        for (let track of w.sm.tracks) {
+            if (track.isPlaying()) text += "Playing "
+            else text += "Cued ";
+            text += "\"" + track.file + "\"";
+            text += '<br>';
+            text += "Elapsed " + Utils.formatMMSS(track.currentTime()) + " of " + Utils.formatMMSS(track.duration())
+            text += '<br>';
+            text += '<br>';
+        }
+        this.FFTPlaybackDisplay.innerHTML = text;
     }
 
     actions = {
         parent: this,
         generatedImage: document.querySelector("#generated-image"),
         nameMeta() {
-            return nf(ig.count, 4) + "--" + Utils.getFormattedTime();
+            return nf(w.ig.count, 4) + "--" + Utils.getFormattedTime();
         },
         downloadBoth() {
             this.downloadImage();
@@ -333,91 +369,38 @@ class UI {
             }, 200);
         },
         resetFFTAnalysis() {
-            sm.resetFFTAnalysis();
+            w.sm.resetFFTAnalysis();
         },
         toggleAudio() {
-            sm.toggleAudio();
+            w.sm.toggleAudio();
         },
         generateFFTWalk() {
-            let vectors = Utils.mapFFTToLatentSpaceRange(sm.spectrums);
-            ig.startJob(vectors);
+            let mergedSpectrums = VectorComposer.mergeMultipleSpectrums(w.sm.analysis);
+            let vectors = VectorComposer.mapFFTToLatentSpaceRange(mergedSpectrums);
+            w.ig.startJob(vectors);
         }
     }
 }
 
-class SoundManager {
-    song;
-    amp;
-    ampValues = [];
-    wave = [];
-    fft;
-    spectrums = [];
-    shouldAnalyse = true;
+class VectorComposer {
+    static mergeMultipleSpectrums(analysis) {
+        let mergedSpectrums = []
+        for (let [i, spectrums] of analysis.entries()) {
+            for (let [j, spectrum] of spectrums.entries()) {
+                if (!mergedSpectrums[j]) mergedSpectrums[j] = []
+                for (let [k, value] of spectrum.entries()) {
+                    if (!mergedSpectrums[j][k]) mergedSpectrums[j][k] = 0
+                    mergedSpectrums[j][k] += value;
 
-    preload() {
-        this.song = loadSound('assets/04 No.mp3');
-    }
-
-    setup() {
-        this.amp = new p5.Amplitude()
-        this.getWave();
-        this.fft = new p5.FFT(0.8, 512);
-        this.song.onended(this.stopFFTAnalysis.bind(this));
-    }
-
-    update() {
-        this.ampValues.push(this.amp.getLevel())
-
-        if (this.song.isPlaying() && this.shouldAnalyse) {
-            this.getFFT();
+                    if (i == analysis.length-1) {
+                        mergedSpectrums[j][k] = parseInt(mergedSpectrums[j][k] / analysis.length);
+                    }
+                }
+            }
         }
+        return mergedSpectrums;
     }
 
-    toggleAudio() {
-        if (this.song.isPlaying()) {
-            this.song.stop();
-        } else {
-            this.song.play();
-            this.startFFTAnalysis();
-        }
-    }
-
-    getWave() {
-        let frames = fps * this.song.duration()
-        this.wave = this.song.getPeaks(frames);
-    }
-
-    startFFTAnalysis() {
-        this.spectrums = [];
-        this.shouldAnalyse = true;
-        ui.updateAnalysisDisplay();
-    }
-
-    resetFFTAnalysis() {
-        this.song.stop();
-        this.spectrums = [];
-        this.shouldAnalyse = true;
-        ui.updateAnalysisDisplay();
-    }
-
-    stopFFTAnalysis() {
-        this.shouldAnalyse = false;
-        setTimeout(function () {
-            ui.updateAnalysisDisplay();
-        }, 100)
-    }
-
-    getFFT() {
-        let spectrum = this.fft.analyze();
-        this.spectrums.push(spectrum);
-    }
-}
-
-class Utils {
-    static getFormattedTime() {
-        let d = new Date();
-        return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate() + "-" + d.getHours() + "-" + d.getMinutes() + "-" + d.getSeconds();
-    }
     static mapFFTToLatentSpaceRange(spectrums) {
         let vectors = [];
         for (let i = 0; i < spectrums.length; i++) {
@@ -431,6 +414,113 @@ class Utils {
         }
         return vectors;
     }
+}
+
+class SoundManager {
+    files = w.audioFiles
+    tracks = [];
+    ffts = [];
+    analysis = [];
+    waves = [];
+    amps = [];
+    amplitudes = [];
+
+    preload() {
+        for (let [i, file] of this.files.entries()) {
+            this.tracks.push(loadSound('assets/' + file));
+            this.analysis[i] = [];
+            this.waves[i] = [];
+            this.amplitudes[i] = [];
+        }
+    }
+
+    setup() {
+        this.getWaves();
+        for (let track of this.tracks) {
+            let amp = new p5.Amplitude()
+            amp.setInput(track);
+            this.amps.push(amp)
+
+            let fft = new p5.FFT(0.9, 512);
+            fft.setInput(track);
+            this.ffts.push(fft);
+
+            // first track ending will stop all analysis
+            track.onended(this.stopFFTAnalysis.bind(this));
+        }
+    }
+
+    getWaves() {
+        for (let [i, track] of this.tracks.entries()) {
+            let frames = w.fps * track.duration();
+            this.waves[i] = track.getPeaks(frames);
+        }
+    }
+
+    update() {
+        for (let [i, amp] of this.amps.entries()) {
+            this.amplitudes[i].push(amp.getLevel());
+        }
+        this.getFFTs();
+    }
+
+    startFFTAnalysis() {
+        if (!this.shouldAnalyse) {
+            for (let i = 0; i < this.analysis.length; i++) {
+                this.analysis[i] = []
+            }
+            this.shouldAnalyse = true;
+            w.ui.updateAnalysisDisplay();
+        }
+    }
+
+    getFFTs() {
+        if (this.shouldAnalyse) {
+            for (let [i, track] of this.tracks.entries()) {
+                if (track.isPlaying()) {
+                    let spectrum = this.ffts[i].analyze();
+                    this.analysis[i].push(spectrum);
+                }
+            }
+        }
+    }
+
+    resetFFTAnalysis() {
+        for (let track of this.tracks) {
+            track.stop();
+        }
+        for (let i = 0; i < this.analysis.length; i++) {
+            this.analysis[i] = []
+        }
+        w.ui.updateAnalysisDisplay();
+    }
+
+    stopFFTAnalysis() {
+        if (this.shouldAnalyse) {
+            this.shouldAnalyse = false;
+            w.ui.updateAnalysisDisplay();
+        }
+    }
+
+    toggleAudio() {
+        let playing = false;
+        for (let track of this.tracks) {
+            if (track.isPlaying()) {
+                track.stop();
+            } else {
+                track.play();
+                playing = true;
+            }
+        }
+        if (playing) this.startFFTAnalysis();
+    }
+}
+
+class Utils {
+    static getFormattedTime() {
+        let d = new Date();
+        return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate() + "-" + d.getHours() + "-" + d.getMinutes() + "-" + d.getSeconds();
+    }
     static formatMMSS(time) {
         var minutes = Math.floor(time / 60);
         var seconds = (time - minutes * 60).toFixed(2);
@@ -440,36 +530,44 @@ class Utils {
     }
 }
 
-let ig;
-let ui;
-let sm;
-let fps = 30;
+let w = window;
+w.ig;
+w.ui;
+w.sm;
+w.fps = 30;
+w.audioFiles = [
+    // "11 Girl.mp3"
+    "Fires 14.1 - 45s - Drums.wav",
+    "Fires 14.1 - 45s - Whole.wav",
+    "Fires 14.1 - 45s - hi-lo.wav",
+    "Fires 14.1 - 45s - Phrase.wav"
+]
 
 function preload() {
-    ig = new ImageGenerator()
-    ui = new UI()
-    sm = new SoundManager()
-    sm.preload();
+    w.ig = new ImageGenerator()
+    w.ui = new UI()
+    w.sm = new SoundManager()
+    w.sm.preload();
 }
 
 function setup() {
-    frameRate(fps);
+    frameRate(w.fps);
     pixelDensity(1);
     angleMode(DEGREES);
-    let p5js = createCanvas(1024, 1024);
+    let p5js = createCanvas(512, 2048);
     p5js.parent("p5js");
-    sm.setup();
+    w.sm.setup();
 }
 
 function draw() {
     clear();
-    sm.update();
-    ui.update();
+    w.sm.update();
+    w.ui.update();
 }
 
 function globalAttemptGeneratingImage() {
-    if (ui.vectorChanged && !ig.isGenerating) {
-        ig.generateImage();
-        ui.vectorChanged = false;
+    if (w.ui.vectorChanged && !w.ig.isGenerating) {
+        w.ig.generateImage();
+        w.ui.vectorChanged = false;
     }
 }

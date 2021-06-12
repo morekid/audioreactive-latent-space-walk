@@ -34,11 +34,11 @@
             }
 
             .generated-image-wrapper {
-                position: absolute;
+                position: relative;
                 left: 0;
                 top: 0;
-                width: 100%;
-                height: 100%;
+                width: 512px;
+                height: 512px;
                 background: #222222;
             }
 
@@ -59,11 +59,11 @@
 
             .p5js > canvas {
                 width: 512px !important;
-                height: 512px !important;
+                height: 2048px !important;
             }
 
             .bottom {
-                margin: 48px;
+                margin: 48px 0 0;
             }
 
             .info-line span {
@@ -87,6 +87,10 @@
                 opacity: 1;
                 transition: all 0.2s;
             }
+
+            .playback-display {
+                display: block;
+            }
         </style>
     </head>
     <body>
@@ -94,31 +98,27 @@
             <div class="left">
                 <div id="get-image" class="get-image">saving image...</div>
                 <div class="generated-image-wrapper"><img id="generated-image" class="generated-image" src=""></div>
+                <div class="bottom">
+                    <strong>Controls</strong>
+                    <p class="info-line">Click+drag top right quadrant<span> — changes vector</span></p>
+                    <p class="info-line">L<span> — draw line at mouse position</span></p>
+                    <p class="info-line">0<span> - reset FFT analysis</span></p>
+                    <p>♫ <a href="#" onclick="ui.actions.toggleAudio(); return false;">Play / Stop</a></p>
+                    <p>҉ <a href="#" onclick="ui.actions.generateFFTWalk(); return false;">Generate FFT walk</a></p>
+                    <br>
+                    <strong>Export</strong>
+                    <p class="info-line">1<span> — ↓  download vector</span></p>
+                    <p class="info-line">2<span> — ↓  download image</span></p>
+                    <p class="info-line">3<span> — ↓↓ download vector & image</span></p>
+                    <br>
+                    <p>fps: <strong id="fps-display">-</strong></p>
+                    <p>FFT Analysis: <strong id="fft-state-display">-</strong></p>
+                    <p>Job: <strong id="fft-job-display">-</strong></p>
+                    <p>Playback: <strong class="playback-display" id="fft-playback-display">-</strong></p>
+                </div>
             </div>
             <div class="right">
                 <div id="get-vector" class="get-vector">saving vector...</div>
-                <canvas id="matrix" class="matrix" width="512" height="512"></canvas>
-            </div>
-        </div>
-        <div class="row">
-            <div class="left">
-                <strong>Controls</strong>
-                <p class="info-line">Click+drag top right quadrant<span> — changes vector</span></p>
-                <p class="info-line">L<span> — draw line at mouse position</span></p>
-                <p class="info-line">0<span> - reset FFT analysis</span></p>
-                <p>♫ <a href="#" onclick="ui.actions.toggleAudio(); return false;">Play / Stop</a><span class="info-line"> <span>— Elapsed</span> <span id="song-timing-display"></span> <span>of</span> <span id="song-duration-display"></span></span></p>
-                <p>҉ <a href="#" onclick="ui.actions.generateFFTWalk(); return false;">Generate FFT walk</a></p>
-                <br>
-                <strong>Export</strong>
-                <p class="info-line">1<span> — ↓  download vector</span></p>
-                <p class="info-line">2<span> — ↓  download image</span></p>
-                <p class="info-line">3<span> — ↓↓ download vector & image</span></p>
-                <br>
-                <p>fps: <strong id="fps-display"></strong></p>
-                <p>Analysis: <strong id="fft-state-display"></strong></p>
-                <p>Job: <strong id="fft-job-display"></strong></p>
-            </div>
-            <div class="right">
                 <div id="p5js" class="p5js"></div>
             </div>
         </div>
