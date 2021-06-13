@@ -1,3 +1,17 @@
+class Utils {
+    static getFormattedTime() {
+        let d = new Date();
+        return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate() + "-" + d.getHours() + "-" + d.getMinutes() + "-" + d.getSeconds();
+    }
+    static formatMMSS(time) {
+        var minutes = Math.floor(time / 60);
+        var seconds = (time - minutes * 60).toFixed(2);
+        if (minutes.toString().length < 2) minutes = "0" + minutes;
+        if (seconds.toString().length < 5) seconds = "0" + seconds;
+        return minutes + ":" + seconds;
+    }
+}
+
 class ImageGenerator {
     testRun = true; // set to true for testing without RunwayML
     outputImage;
@@ -382,40 +396,6 @@ class UI {
     }
 }
 
-class VectorComposer {
-    static mergeMultipleSpectrums(analysis) {
-        let mergedSpectrums = []
-        for (let [i, spectrums] of analysis.entries()) {
-            for (let [j, spectrum] of spectrums.entries()) {
-                if (!mergedSpectrums[j]) mergedSpectrums[j] = []
-                for (let [k, value] of spectrum.entries()) {
-                    if (!mergedSpectrums[j][k]) mergedSpectrums[j][k] = 0
-                    mergedSpectrums[j][k] += value;
-
-                    if (i == analysis.length-1) {
-                        mergedSpectrums[j][k] = parseInt(mergedSpectrums[j][k] / analysis.length);
-                    }
-                }
-            }
-        }
-        return mergedSpectrums;
-    }
-
-    static mapFFTToLatentSpaceRange(spectrums) {
-        let vectors = [];
-        for (let i = 0; i < spectrums.length; i++) {
-            let vector = [];
-            let spectrum = spectrums[i];
-            for (let j = 0; j < spectrum.length; j++) {
-                let mapped = map(spectrum[j], 0, 255, -1, 1);
-                vector.push(mapped);
-            }
-            vectors.push(vector);
-        }
-        return vectors;
-    }
-}
-
 class SoundManager {
     files = w.audioFiles
     tracks = [];
@@ -427,7 +407,7 @@ class SoundManager {
 
     preload() {
         for (let [i, file] of this.files.entries()) {
-            this.tracks.push(loadSound('assets/' + file));
+            this.tracks.push(loadSound('assets/' + file.name));
             this.analysis[i] = [];
             this.waves[i] = [];
             this.amplitudes[i] = [];
@@ -516,17 +496,45 @@ class SoundManager {
     }
 }
 
-class Utils {
-    static getFormattedTime() {
-        let d = new Date();
-        return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate() + "-" + d.getHours() + "-" + d.getMinutes() + "-" + d.getSeconds();
+class VectorComposer {
+    static mergeMultipleSpectrums(analysis) {
+        let mergedSpectrums = []
+        for (let [i, spectrums] of analysis.entries()) {
+            let weight = w.audioFiles[i].weight;
+            let method = w.audioFiles[i].method;
+            let prevSpectrum = [];
+            for (let [j, spectrum] of spectrums.entries()) {
+                if (!mergedSpectrums[j]) mergedSpectrums[j] = []
+                for (let [k, value] of spectrum.entries()) {
+                    value *= weight
+                    if (method == "relative") {
+                        // sum previous value to current
+                        if (!prevSpectrum[k]) prevSpectrum[k] = 0;
+                        prevSpectrum[k] += value;
+                        if (prevSpectrum[k] > 255) prevSpectrum[k] -= 255;
+                        // replace value
+                        value = prevSpectrum[k];
+                    }
+                    if (!mergedSpectrums[j][k]) mergedSpectrums[j][k] = 0
+                    mergedSpectrums[j][k] += value; // this should be checked for > 255 not the value before adding it
+                }
+            }
+        }
+        return mergedSpectrums;
     }
-    static formatMMSS(time) {
-        var minutes = Math.floor(time / 60);
-        var seconds = (time - minutes * 60).toFixed(2);
-        if (minutes.toString().length < 2) minutes = "0" + minutes;
-        if (seconds.toString().length < 5) seconds = "0" + seconds;
-        return minutes + ":" + seconds;
+
+    static mapFFTToLatentSpaceRange(spectrums) {
+        let vectors = [];
+        for (let i = 0; i < spectrums.length; i++) {
+            let vector = [];
+            let spectrum = spectrums[i];
+            for (let j = 0; j < spectrum.length; j++) {
+                let mapped = map(spectrum[j], 0, 255, -1, 1);
+                vector.push(mapped);
+            }
+            vectors.push(vector);
+        }
+        return vectors;
     }
 }
 
@@ -536,11 +544,11 @@ w.ui;
 w.sm;
 w.fps = 30;
 w.audioFiles = [
-    // "11 Girl.mp3"
-    "Fires 14.1 - 45s - Drums.wav",
-    "Fires 14.1 - 45s - Whole.wav",
-    "Fires 14.1 - 45s - hi-lo.wav",
-    "Fires 14.1 - 45s - Phrase.wav"
+    // { name: "11 Girl.mp3", weight: 1, method: "absolute" },
+    { name: "Fires 14.1 - 45s - Drums.wav", weight: 0.25, method: "absolute" },
+    { name: "Fires 14.1 - 45s - Whole.wav", weight: 0, method: "absolute" },
+    { name: "Fires 14.1 - 45s - hi-lo.wav", weight: 0, method: "absolute" },
+    { name: "Fires 14.1 - 45s - Phrase.wav", weight: 0, method: "relative" }
 ]
 
 function preload() {
