@@ -501,22 +501,22 @@ class VectorComposer {
         let mergedSpectrums = []
         for (let [i, spectrums] of analysis.entries()) {
             let weight = w.audioFiles[i].weight;
-            let method = w.audioFiles[i].method;
+            let blend = w.audioFiles[i].blend;
             let prevSpectrum = [];
             for (let [j, spectrum] of spectrums.entries()) {
                 if (!mergedSpectrums[j]) mergedSpectrums[j] = []
                 for (let [k, value] of spectrum.entries()) {
                     value *= weight
-                    if (method == "relative") {
+                    if (blend == "add") {
                         // sum previous value to current
                         if (!prevSpectrum[k]) prevSpectrum[k] = 0;
                         prevSpectrum[k] += value;
-                        if (prevSpectrum[k] > 255) prevSpectrum[k] -= 255;
-                        // replace value
+                        if (prevSpectrum[k] > 255) prevSpectrum[k] -= 255; // check bounds after summing
                         value = prevSpectrum[k];
                     }
                     if (!mergedSpectrums[j][k]) mergedSpectrums[j][k] = 0
-                    mergedSpectrums[j][k] += value; // this should be checked for > 255 not the value before adding it
+                    mergedSpectrums[j][k] += value;
+                    if (mergedSpectrums[j][k] > 255) mergedSpectrums[j][k] -= 255; // check bounds after summing
                 }
             }
         }
@@ -539,17 +539,32 @@ class VectorComposer {
 }
 
 let w = window;
+
+/* usually set according to the frame rate of the final image sequenced movie */
+w.fps = 30;
+
+/* Multiple audio file options
+    Attributes can be specified for each file
+    that control how spectrums are merged into the vector.
+    weight: scales the spectrum. Can be any value, 1 is the original amplitude 0 is like it's off.
+    blend: how the current spectrum is merged with previous spectrum values.
+        "normal" will replace each time, the most common approach, vector resembles the spectrum analysis.
+        "add" will sum each time resulting in ever growing values (contained with pac man effect).
+    
+    All file spectrums will still be summed to each other so values can easily go past the vector bounds (-1, 1).
+    E.g.: To equally sum 4 files set their weight to 0.25.
+*/
+w.audioFiles = [
+    // { name: "11 Girl.mp3", weight: 1, method: "absolute" },
+    { name: "Fires 14.1 - 45s - Drums.wav", weight: 0.5, blend: "normal" },
+    { name: "Fires 14.1 - 45s - Whole.wav", weight: 0.01, blend: "add" },
+    { name: "Fires 14.1 - 45s - hi-lo.wav", weight: 0, blend: "normal" },
+    { name: "Fires 14.1 - 45s - Phrase.wav", weight: 0, blend: "normal" }
+]
+
 w.ig;
 w.ui;
 w.sm;
-w.fps = 30;
-w.audioFiles = [
-    // { name: "11 Girl.mp3", weight: 1, method: "absolute" },
-    { name: "Fires 14.1 - 45s - Drums.wav", weight: 0.25, method: "absolute" },
-    { name: "Fires 14.1 - 45s - Whole.wav", weight: 0, method: "absolute" },
-    { name: "Fires 14.1 - 45s - hi-lo.wav", weight: 0, method: "absolute" },
-    { name: "Fires 14.1 - 45s - Phrase.wav", weight: 0, method: "relative" }
-]
 
 function preload() {
     w.ig = new ImageGenerator()
