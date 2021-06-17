@@ -502,26 +502,161 @@ class VectorComposer {
         for (let [i, spectrums] of analysis.entries()) {
             let weight = w.audioFiles[i].weight;
             let blend = w.audioFiles[i].blend;
-            let prevSpectrum = [];
-            for (let [j, spectrum] of spectrums.entries()) {
-                if (!mergedSpectrums[j]) mergedSpectrums[j] = []
-                for (let [k, value] of spectrum.entries()) {
-                    value *= weight
-                    if (blend == "add") {
-                        // sum previous value to current
-                        if (!prevSpectrum[k]) prevSpectrum[k] = 0;
-                        prevSpectrum[k] += value;
-                        if (prevSpectrum[k] > 255) prevSpectrum[k] -= 255; // check bounds after summing
-                        value = prevSpectrum[k];
-                    }
-                    if (!mergedSpectrums[j][k]) mergedSpectrums[j][k] = 0
-                    mergedSpectrums[j][k] += value;
-                    if (mergedSpectrums[j][k] > 255) mergedSpectrums[j][k] -= 255; // check bounds after summing
-                }
+            let flip = w.audioFiles[i].flip;
+            let offset = w.audioFiles[i].offset;
+            
+            let prepped = []
+            if (blend == "add") {
+                prepped = this.prepForAdd(spectrums, weight)
+            } else {
+                prepped = this.prepForNormal(spectrums, weight)
+            }
+
+            if (flip == "h") {
+                prepped = this.flipHorizontal(prepped)
+            } else if (flip == "v") {
+                prepped = this.flipVertical(prepped)
+            } else if (flip == "hv") {
+                prepped = this.flipHorizontal(prepped)
+                prepped = this.flipVertical(prepped)
+            }
+
+            if (offset) {
+                prepped = this.offset(prepped, offset)
+            }
+
+            let merged = this.merge(prepped, mergedSpectrums);
+            mergedSpectrums = merged;
+        }
+        let limitedMerged = this.pacManLimit(mergedSpectrums);
+        return limitedMerged;
+    }
+
+    static prepForNormal(spectrums, weight) {
+        return spectrums.map((spectrum) => {
+            return spectrum.map((value) => {
+                return value * weight;
+            })
+        })
+    }
+
+    static prepForAdd(spectrums, weight) {
+        let cumulativeSpectrum = [];
+        return spectrums.map((spectrum) => {
+            cumulativeSpectrum = spectrum.map((value, i) => {
+                return (value * weight + (cumulativeSpectrum[i] ?? 0));
+            })
+            return cumulativeSpectrum;
+        })
+    }
+
+    static flipHorizontal(spectrums) {
+        return spectrums.map((spectrum) => {
+            return spectrum.reverse();
+        })
+    }
+
+    static flipVertical(spectrums) {
+        return spectrums.map((spectrum) => {
+            return spectrum.map((value) => {
+                return value *= -1
+            })
+        })
+    }
+
+    static offset(spectrums, offset) {
+        return spectrums.map((spectrum) => {
+            if (offset.x) {
+                let splitPoint = parseInt(spectrum.length * (1 - offset.x));
+                let end = spectrum.splice(0, splitPoint)
+                spectrum = spectrum.concat(end)
+            }
+            if (offset.y) {
+                spectrum = spectrum.map((value) => {
+                    if (value != 0 || offset.zero) {
+                        value = parseInt(value + (offset.y * 255))
+                    } 
+                    return value
+                })
+            }
+            return spectrum
+        })
+    }
+
+    static merge(spectrums, mergedSpectrums) {
+        return spectrums.map((spectrum, i) => {
+            return spectrum.map((value, j) => {
+                return value + (mergedSpectrums[i] ? mergedSpectrums[i][j] ?? 0 : 0)
+            })
+        })
+    }
+
+    static pacManLimit(spectrums) {
+        return spectrums.map((spectrum, i) => {
+            return spectrum.map((value, j) => {
+                value %= 255
+                return value < 0 ? value + 255 : value
+            })
+        })
+    }
+
+    /*
+    static mergeMultipleSpectrums(analysis) {
+        let mergedSpectrums = []
+        for (let [i, spectrums] of analysis.entries()) {
+            let weight = w.audioFiles[i].weight;
+            let blend = w.audioFiles[i].blend;
+            let flip = w.audioFiles[i].flip;
+
+            mergedSpectrums = this.flipSpectrums(flip, mergedSpectrums);
+
+            if (blend == "add") {
+                mergedSpectrums = this.mergeSpectrumsAdd(mergedSpectrums, spectrums, weight)
+            } else {
+                mergedSpectrums = this.mergeSpectrumsNormal(mergedSpectrums, spectrums, weight)
             }
         }
         return mergedSpectrums;
     }
+
+    static flipSpectrums(flip, spectrums) {
+        if (flip == "h") {
+            spectrums = spectrums.map((spectrum) => {
+                return spectrum.reverse();
+            })
+        }
+
+        return spectrums;
+    }
+
+    static mergeSpectrumsNormal(mergedSpectrums, spectrums, weight) {
+        function mergeSpectrum(mergedSpectrum, spectrum, weight) {
+            // adds weighted new spectrum to merged spectrum
+            // always calculates the remainder of 255 to stay in boundaries
+            return spectrum.map((value, i) => {
+                return (value * weight + (mergedSpectrum ? mergedSpectrum[i] ?? 0 : 0)) % 255;
+            })
+        }
+        // merge track spectrums to merged spectrums container
+        return spectrums.map((spectrum, i) => {
+            return mergeSpectrum(mergedSpectrums[i], spectrum, weight);
+        })
+    }
+
+    static mergeSpectrumsAdd(mergedSpectrums, spectrums, weight) {
+        let prevSpectrum = [];
+
+        return spectrums.map((spectrum, j) => {
+            prevSpectrum = spectrum.map((value, k) => {
+                return (value * weight + (prevSpectrum[k] ?? 0)) % 255;
+            })
+
+            return prevSpectrum.map((value, k) => {
+                return (value + (mergedSpectrums[j] ? mergedSpectrums[j][k] ?? 0 : 0)) % 255;
+            })
+        })
+    }
+    */
 
     static mapFFTToLatentSpaceRange(spectrums) {
         let vectors = [];
@@ -548,18 +683,28 @@ w.fps = 30;
     that control how spectrums are merged into the vector.
     weight: scales the spectrum. Can be any value, 1 is the original amplitude 0 is like it's off.
     blend: how the current spectrum is merged with previous spectrum values.
-        "normal" will replace each time, the most common approach, vector resembles the spectrum analysis.
+        "normal" the default, will replace the spectrum each time, the most common approach, vector resembles the spectrum analysis.
         "add" will sum each time resulting in ever growing values (contained with pac man effect).
-    
+    flip: changes the orientation of the spectrum when applied to the vector.
+        null no flip
+        "h" flips horizontally
+        "v" flips vertically
+        "hv" flips both horizontally and vertically
+    offset:adds an offset to the spectrum when applied to the vector.
+        x: 0-1 range
+        y: 0-1 range
+        zero: true or false will also offset zero values
+        Values are x,y coords in a 0-1 range, eg: {x: 0.2, y: 0.3}.
+
     All file spectrums will still be summed to each other so values can easily go past the vector bounds (-1, 1).
-    E.g.: To equally sum 4 files set their weight to 0.25.
+    Eg: To equally sum 4 files set their weight to 0.25.
 */
 w.audioFiles = [
     // { name: "11 Girl.mp3", weight: 1, method: "absolute" },
-    { name: "Fires 14.1 - 45s - Drums.wav", weight: 0.5, blend: "normal" },
-    { name: "Fires 14.1 - 45s - Whole.wav", weight: 0.01, blend: "add" },
-    { name: "Fires 14.1 - 45s - hi-lo.wav", weight: 0, blend: "normal" },
-    { name: "Fires 14.1 - 45s - Phrase.wav", weight: 0, blend: "normal" }
+    { name: "Fires 14.1 - 45s - Drums.wav", weight: 0.5, blend: "normal", flip: null, offset: {x: 0, y: 0.5, zero: true} },
+    { name: "Fires 14.1 - 45s - Whole.wav", weight: 0.01, blend: "add", flip: "h", offset: {x: 0, y: 0.5, zero: false} },
+    { name: "Fires 14.1 - 45s - hi-lo.wav", weight: 0, blend: "normal", flip: "h", offset: null },
+    { name: "Fires 14.1 - 45s - Phrase.wav", weight: 0, blend: "add", flip: "hv", offset: null }
 ]
 
 w.ig;
