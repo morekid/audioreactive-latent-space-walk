@@ -13,7 +13,6 @@ class Utils {
 }
 
 class ImageGenerator {
-    testRun = true; // set to true for testing without RunwayML
     outputImage;
     isGenerating = false;
     count = 0;
@@ -33,10 +32,10 @@ class ImageGenerator {
             truncation: 1
         };
         if (job) {
-            if (!this.testRun) httpPost(path, 'json', data, this.stepDone.bind(this), this.stepError.bind(this));
+            if (!w.testRun) httpPost(path, 'json', data, this.stepDone.bind(this), this.stepError.bind(this));
             else this.stepDone();
         } else {
-            if (!this.testRun) httpPost(path, 'json', data, this.success.bind(this), this.error.bind(this));
+            if (!w.testRun) httpPost(path, 'json', data, this.success.bind(this), this.error.bind(this));
             else this.success();
         }
     }
@@ -53,7 +52,7 @@ class ImageGenerator {
     }
 
     success(result) {
-        if (!this.testRun) this.createImage(result);
+        if (!w.testRun) this.createImage(result);
         globalAttemptGeneratingImage();
     }
 
@@ -72,7 +71,7 @@ class ImageGenerator {
     }
 
     stepDone(result) {
-        if (!this.testRun) {
+        if (!w.testRun) {
             this.createImage(result);
             w.ui.actions.downloadBoth();
         }
@@ -80,7 +79,7 @@ class ImageGenerator {
         this.job.current += 1;
         if (this.job.current < this.job.vectors.length) {
             let _this = this;
-            if (!this.testRun)  {
+            if (!w.testRun)  {
                 setTimeout( function () {
                     _this.stepJob();
                 }, 100);
@@ -130,6 +129,7 @@ class UI {
     update() {
         this.fpsDisplay.textContent = frameRate().toFixed(2);
         this.trackMouse();
+        if (w.vectorizeLiveAnalysis && w.sm.shouldAnalyse) this.pullSMVectorUpdate();
         this.drawVector();
         this.drawWaveforms();
         this.drawSongAmplitude();
@@ -172,6 +172,21 @@ class UI {
         this.vectorChanged = true;
 
         globalAttemptGeneratingImage();
+    }
+
+    pullSMVectorUpdate() {
+        let hasData = false;
+        let analysisSlice = w.sm.analysis.map((spectrums) => {
+            let spectrum = spectrums[spectrums.length - 1 ?? 0];
+            if (spectrum) {
+                hasData = true;
+                return [spectrums[spectrums.length - 1 ?? 0]];
+            } else {
+                hasData = false;
+                return null;
+            };
+        })
+        if (hasData) this.actions.generateVectorPreview(analysisSlice);
     }
 
     updateVector(vector) {
@@ -325,7 +340,7 @@ class UI {
                 this.FFTJobDisplay.textContent = "-";
             }
         }
-        if (w.ig.testRun) this.FFTJobDisplay.textContent = "(Test Run) " + this.FFTJobDisplay.textContent;
+        if (w.testRun) this.FFTJobDisplay.textContent = "(Test Run) " + this.FFTJobDisplay.textContent;
     }
 
     updatePlaybackDisplay() {
@@ -392,6 +407,11 @@ class UI {
             let mergedSpectrums = VectorComposer.mergeMultipleSpectrums(w.sm.analysis);
             let vectors = VectorComposer.mapFFTToLatentSpaceRange(mergedSpectrums);
             w.ig.startJob(vectors);
+        },
+        generateVectorPreview(analysisSlice) {
+            let mergedSpectrums = VectorComposer.mergeMultipleSpectrums(analysisSlice);
+            let vectors = VectorComposer.mapFFTToLatentSpaceRange(mergedSpectrums);
+            this.parent.updateVector(vectors[0]);
         }
     }
 }
@@ -404,6 +424,7 @@ class SoundManager {
     waves = [];
     amps = [];
     amplitudes = [];
+
 
     preload() {
         for (let [i, file] of this.files.entries()) {
@@ -643,11 +664,17 @@ w.fps = 30;
 */
 w.audioFiles = [
     // { name: "11 Girl.mp3", weight: 1, method: "absolute" },
-    { name: "Fires 14.1 - 45s - Drums.wav", weight: 0.5, blend: "normal", flip: null, offset: null },
-    { name: "Fires 14.1 - 45s - Whole.wav", weight: 0.01, blend: "add", flip: "h", offset: null },
-    { name: "Fires 14.1 - 45s - hi-lo.wav", weight: 0, blend: "normal", flip: "h", offset: null },
-    { name: "Fires 14.1 - 45s - Phrase.wav", weight: 0, blend: "add", flip: "hv", offset: null }
+    { name: "Fires 14.1 - 45s - Drums.wav",     weight: 0.7,        blend: "normal",        flip: null,    offset: null },
+    { name: "Fires 14.1 - 45s - Whole.wav",     weight: 0.0007,     blend: "add",           flip: null,    offset: {x: 0.5, y: 0, zero: false} },
+    { name: "Fires 14.1 - 45s - hi-lo.wav",     weight: 0.5,      blend: "normal",        flip: "h",     offset: null },
+    { name: "Fires 14.1 - 45s - Phrase.wav",    weight: 0.5,      blend: "normal",        flip: "h",     offset: null }
 ]
+
+/* set to true for testing without RunwayML */
+w.testRun = true;
+
+/* Immediately draw the vector based on live analysis. Ignores "add" blend method for files */
+w.vectorizeLiveAnalysis = true;
 
 w.ig;
 w.ui;
