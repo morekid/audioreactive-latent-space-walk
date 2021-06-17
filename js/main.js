@@ -600,64 +600,6 @@ class VectorComposer {
         })
     }
 
-    /*
-    static mergeMultipleSpectrums(analysis) {
-        let mergedSpectrums = []
-        for (let [i, spectrums] of analysis.entries()) {
-            let weight = w.audioFiles[i].weight;
-            let blend = w.audioFiles[i].blend;
-            let flip = w.audioFiles[i].flip;
-
-            mergedSpectrums = this.flipSpectrums(flip, mergedSpectrums);
-
-            if (blend == "add") {
-                mergedSpectrums = this.mergeSpectrumsAdd(mergedSpectrums, spectrums, weight)
-            } else {
-                mergedSpectrums = this.mergeSpectrumsNormal(mergedSpectrums, spectrums, weight)
-            }
-        }
-        return mergedSpectrums;
-    }
-
-    static flipSpectrums(flip, spectrums) {
-        if (flip == "h") {
-            spectrums = spectrums.map((spectrum) => {
-                return spectrum.reverse();
-            })
-        }
-
-        return spectrums;
-    }
-
-    static mergeSpectrumsNormal(mergedSpectrums, spectrums, weight) {
-        function mergeSpectrum(mergedSpectrum, spectrum, weight) {
-            // adds weighted new spectrum to merged spectrum
-            // always calculates the remainder of 255 to stay in boundaries
-            return spectrum.map((value, i) => {
-                return (value * weight + (mergedSpectrum ? mergedSpectrum[i] ?? 0 : 0)) % 255;
-            })
-        }
-        // merge track spectrums to merged spectrums container
-        return spectrums.map((spectrum, i) => {
-            return mergeSpectrum(mergedSpectrums[i], spectrum, weight);
-        })
-    }
-
-    static mergeSpectrumsAdd(mergedSpectrums, spectrums, weight) {
-        let prevSpectrum = [];
-
-        return spectrums.map((spectrum, j) => {
-            prevSpectrum = spectrum.map((value, k) => {
-                return (value * weight + (prevSpectrum[k] ?? 0)) % 255;
-            })
-
-            return prevSpectrum.map((value, k) => {
-                return (value + (mergedSpectrums[j] ? mergedSpectrums[j][k] ?? 0 : 0)) % 255;
-            })
-        })
-    }
-    */
-
     static mapFFTToLatentSpaceRange(spectrums) {
         let vectors = [];
         for (let i = 0; i < spectrums.length; i++) {
@@ -701,8 +643,8 @@ w.fps = 30;
 */
 w.audioFiles = [
     // { name: "11 Girl.mp3", weight: 1, method: "absolute" },
-    { name: "Fires 14.1 - 45s - Drums.wav", weight: 0.5, blend: "normal", flip: null, offset: {x: 0, y: 0.5, zero: true} },
-    { name: "Fires 14.1 - 45s - Whole.wav", weight: 0.01, blend: "add", flip: "h", offset: {x: 0, y: 0.5, zero: false} },
+    { name: "Fires 14.1 - 45s - Drums.wav", weight: 0.5, blend: "normal", flip: null, offset: null },
+    { name: "Fires 14.1 - 45s - Whole.wav", weight: 0.01, blend: "add", flip: "h", offset: null },
     { name: "Fires 14.1 - 45s - hi-lo.wav", weight: 0, blend: "normal", flip: "h", offset: null },
     { name: "Fires 14.1 - 45s - Phrase.wav", weight: 0, blend: "add", flip: "hv", offset: null }
 ]
