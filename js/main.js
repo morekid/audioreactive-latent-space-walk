@@ -152,7 +152,6 @@ class UI {
             if (e.key == "1") this.actions.downloadVector();
             if (e.key == "2") this.actions.downloadImage();
             if (e.key == "3") this.actions.downloadBoth();
-            if (e.key == "0") this.actions.resetFFTAnalysis();
         });
     }
 
@@ -397,9 +396,6 @@ class UI {
                 getVectorFeedback.classList.remove("is-showing")
             }, 200);
         },
-        resetFFTAnalysis() {
-            w.sm.resetFFTAnalysis();
-        },
         toggleAudio() {
             w.sm.toggleAudio();
         },
@@ -447,7 +443,7 @@ class SoundManager {
             this.ffts.push(fft);
 
             // first track ending will stop all analysis
-            track.onended(this.stopFFTAnalysis.bind(this));
+            track.onended(this.stopAnalysis.bind(this));
         }
     }
 
@@ -459,20 +455,29 @@ class SoundManager {
     }
 
     update() {
-        for (let [i, amp] of this.amps.entries()) {
-            this.amplitudes[i].push(amp.getLevel());
-        }
+        this.getAmplitudes();
         this.getFFTs();
     }
 
-    startFFTAnalysis() {
-        if (!this.shouldAnalyse) {
-            for (let i = 0; i < this.analysis.length; i++) {
-                this.analysis[i] = []
-            }
-            this.shouldAnalyse = true;
-            w.ui.updateAnalysisDisplay();
+    initCollectingAmplitudes() {
+        for (let i = 0; i < this.amplitudes.length; i++) {
+            this.amplitudes[i] = []
         }
+    }
+
+    getAmplitudes() {
+        if (this.shouldAnalyse) {
+            for (let [i, amp] of this.amps.entries()) {
+                this.amplitudes[i].push(amp.getLevel());
+            }
+        }
+    }
+
+    initFFTAnalysis() {
+        for (let i = 0; i < this.analysis.length; i++) {
+            this.analysis[i] = []
+        }
+        w.ui.updateAnalysisDisplay();
     }
 
     getFFTs() {
@@ -486,17 +491,7 @@ class SoundManager {
         }
     }
 
-    resetFFTAnalysis() {
-        for (let track of this.tracks) {
-            track.stop();
-        }
-        for (let i = 0; i < this.analysis.length; i++) {
-            this.analysis[i] = []
-        }
-        w.ui.updateAnalysisDisplay();
-    }
-
-    stopFFTAnalysis() {
+    stopAnalysis() {
         if (this.shouldAnalyse) {
             this.shouldAnalyse = false;
             w.ui.updateAnalysisDisplay();
@@ -513,7 +508,13 @@ class SoundManager {
                 playing = true;
             }
         }
-        if (playing) this.startFFTAnalysis();
+        if (playing) {
+            if (!this.shouldAnalyse) {
+                this.initCollectingAmplitudes();
+                this.initFFTAnalysis();
+                this.shouldAnalyse = true;
+            }
+        }
     }
 }
 
