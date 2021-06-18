@@ -663,15 +663,14 @@ w.fps = 30;
     Eg: To equally sum 4 files set their weight to 0.25.
 */
 w.audioFiles = [
-    // { name: "11 Girl.mp3", weight: 1, method: "absolute" },
-    { name: "Fires 14.1 - 45s - Drums.wav",     weight: 0.7,        blend: "normal",        flip: null,    offset: null },
-    { name: "Fires 14.1 - 45s - Whole.wav",     weight: 0.0007,     blend: "add",           flip: null,    offset: {x: 0.5, y: 0, zero: false} },
-    { name: "Fires 14.1 - 45s - hi-lo.wav",     weight: 0.5,      blend: "normal",        flip: "h",     offset: null },
-    { name: "Fires 14.1 - 45s - Phrase.wav",    weight: 0.5,      blend: "normal",        flip: "h",     offset: null }
+    { name: "Fires 14.1 - Drums.wav",     weight: 0.7,      blend: "normal",        flip: null,    offset: null },
+    { name: "Fires 14.1 - Whole.wav",     weight: 0.0007,   blend: "add",           flip: null,    offset: null },
+    { name: "Fires 14.1 - hi-lo.wav",     weight: 0.5,      blend: "normal",        flip: "hv",     offset: null },
+    { name: "Fires 14.1 - Phrase.wav",    weight: 0.5,      blend: "normal",        flip: "hv",     offset: null }
 ]
 
 /* set to true for testing without RunwayML */
-w.testRun = true;
+w.testRun = false;
 
 /* Immediately draw the vector based on live analysis. Ignores "add" blend method for files */
 w.vectorizeLiveAnalysis = true;
