@@ -438,7 +438,7 @@ class SoundManager {
             amp.setInput(track);
             this.amps.push(amp)
 
-            let fft = new p5.FFT(0.9, 512);
+            let fft = new p5.FFT(w.config.smoothing, 512);
             fft.setInput(track);
             this.ffts.push(fft);
 
@@ -551,6 +551,7 @@ class VectorComposer {
             mergedSpectrums = merged;
         }
         let limitedMerged = this.pacManLimit(mergedSpectrums);
+        if (w.config.flipV) limitedMerged = this.flipMergedVertical(limitedMerged);
         return limitedMerged;
     }
 
@@ -622,6 +623,14 @@ class VectorComposer {
         })
     }
 
+    static flipMergedVertical(spectrums) {
+        return spectrums.map((spectrum) => {
+            return spectrum.map((value) => {
+                return 255 - value
+            })
+        })
+    }
+
     static mapFFTToLatentSpaceRange(spectrums) {
         let vectors = [];
         for (let i = 0; i < spectrums.length; i++) {
@@ -669,6 +678,11 @@ w.audioFiles = [
     { name: "Fires 14.1 - hi-lo.wav",     weight: 0.5,      blend: "normal",        flip: "hv",     offset: null },
     { name: "Fires 14.1 - Phrase.wav",    weight: 0.5,      blend: "normal",        flip: "hv",     offset: null }
 ]
+
+w.config = {
+    flipV: true,
+    smoothing: 0.95
+}
 
 /* set to true for testing without RunwayML */
 w.testRun = false;
