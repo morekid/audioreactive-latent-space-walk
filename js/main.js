@@ -233,6 +233,10 @@ class UI {
             push();
             translate(0, this.vectorAreaOffset + (waveHeight * i * 4));
             rect(map(track.currentTime(), 0, track.duration(), 0, width), 0, 2, waveHeight);
+            if (w.ig.job.running) {
+                fill(0, 200, 80);
+                rect(map(w.ig.job.current, 0, track.duration() * w.fps, 0, width), 0, 2, waveHeight);
+            }
             pop();
         }
     }
