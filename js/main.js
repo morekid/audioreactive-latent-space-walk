@@ -82,7 +82,7 @@ class ImageGenerator {
             if (!w.testRun)  {
                 setTimeout( function () {
                     _this.stepJob();
-                }, 100);
+                }, 10);
             } else {
                 setTimeout( function () {
                     _this.stepJob();
