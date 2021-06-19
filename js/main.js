@@ -370,7 +370,7 @@ class UI {
             let dataStr = this.generatedImage.src;
             let downloadAnchorNode = document.createElement('a');
             downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "img-" + this.nameMeta() + ".png");
+            downloadAnchorNode.setAttribute("download", "img-" + this.nameMeta() + ".jpg");
             document.body.appendChild(downloadAnchorNode); // required for firefox
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
