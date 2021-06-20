@@ -2,13 +2,23 @@
   "name": "runway-stylegan-animations-master",
   "version": "1.0.0",
   "description": "Using RunwayML and P5.js",
-  "main": "main.js",
+  "private": true,
   "dependencies": {
-    "http-server": "^0.12.3"
+    "lodash": "^4.17.21",
+    "p5": "^1.3.1"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "copy-webpack-plugin": "^9.0.0",
+    "css-loader": "^5.2.6",
+    "html-loader": "^2.1.2",
+    "html-webpack-plugin": "^5.3.1",
+    "style-loader": "^2.0.0",
+    "webpack": "^5.39.1",
+    "webpack-cli": "^4.7.2",
+    "webpack-dev-server": "^3.11.2"
+  },
   "scripts": {
-    "start": "http-server -c-1 -p 8081"
+    "serve": "webpack serve"
   },
   "author": "",
   "license": "ISC"
