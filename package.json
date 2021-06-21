@@ -1,7 +1,7 @@
 {
-  "name": "runway-stylegan-animations-master",
+  "name": "audio-reactive-stylegan-latent-space-explorer",
   "version": "1.0.0",
-  "description": "Using RunwayML and P5.js",
+  "description": "A StyleGAN latent space explorer through audio and 2d vector drawing, uses p5.js, RunwayML, Webpack.",
   "main": "main.js",
   "dependencies": {
     "http-server": "^0.12.3"
@@ -13,3 +13,5 @@
   "author": "",
   "license": "ISC"
 }
+
+
