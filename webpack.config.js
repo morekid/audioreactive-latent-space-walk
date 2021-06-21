@@ -24,7 +24,8 @@ module.exports = {
     }),
     new CopyPlugin({
       patterns: [
-        { from: "./assets", to: "./assets" }
+        { from: "./assets", to: "./assets" },
+        { from: "./src/lib", to: "./lib" }
       ],
     }),
   ],
@@ -33,10 +34,6 @@ module.exports = {
       {
         test: /\.css$/i,
         use: ['style-loader', 'css-loader'],
-      },
-      {
-        test: /\.html$/i,
-        loader: 'html-loader',
       }
     ],
   },

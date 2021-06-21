@@ -8,11 +8,6 @@ class SoundManager {
     waves = [];
     amps = [];
     amplitudes = [];
-    sketch;
-
-    constructor(sketch) {
-        this.sketch = sketch;
-    }
 
     preload() {
         for (let [i, file] of this.files.entries()) {
@@ -94,7 +89,7 @@ class SoundManager {
         let playing = false;
         for (let track of this.tracks) {
             if (track.isPlaying()) {
-                // track.stop();
+                track.stop();
             } else {
                 track.play();
                 playing = true;
