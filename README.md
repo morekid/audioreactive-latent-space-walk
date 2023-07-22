@@ -9,3 +9,9 @@ Uses p5.js and Webpack, requests StyleGAN images from RunwayML models.
 `npm run serve`
 
 Set `w.testRun = false` to effectively pull images from the running RunwayML model.
+
+## Sample
+
+https://github.com/morekid/audioreactive-latent-space-walk/assets/632296/608d5540-c0ae-4edc-b5b8-1b214326fcc6
+
+"Fires" by [@morekid](https://www.instagram.com/p/CSZcfPzqBeg/?utm_source=ig_web_copy_link&igshid=MzRlODBiNWFlZA==).
